@@ -1,0 +1,14 @@
+{
+  "name": "꾸준함 달력",
+  "short_name": "꾸준함",
+  "description": "Rachel의 습관 트래커",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D0D14",
+  "theme_color": "#7C3AED",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

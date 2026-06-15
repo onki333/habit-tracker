@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#7C3AED" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="꾸준함" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>꾸준함 달력</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { background: #0D0D14; font-family: 'Apple SD Gothic Neo', 'Pretendard', system-ui, sans-serif; color: #fff; min-height: 100vh; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+    button, input { font-family: inherit; }
+    input { color: #fff; }
+    input::placeholder { color: #444; }
+    input:focus, button:focus { outline: none; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }
+    .pop { animation: pop 0.2s ease; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── Data ──────────────────────────────────────────────
+const DEFAULT_HABITS = [
+  { id: 1, name: "운동", emoji: "💪", color: "#C084FC" },
+  { id: 2, name: "독서", emoji: "📚", color: "#67E8F9" },
+  { id: 3, name: "명상", emoji: "🧘", color: "#86EFAC" },
+  { id: 4, name: "물 2L", emoji: "💧", color: "#FCA5A5" },
+];
+const COLORS = ["#C084FC","#67E8F9","#86EFAC","#FCA5A5","#FCD34D","#A5F3FC","#D8B4FE","#FB923C"];
+const MONTH_KR = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+const DOW_KR = ["일","월","화","수","목","금","토"];
+
+function getDays(y,m){ return new Date(y,m+1,0).getDate(); }
+function getFirstDow(y,m){ return new Date(y,m,1).getDay(); }
+function ck(hid,y,m,d){ return `${hid}-${y}-${m+1}-${d}`; }
+
+let habits = JSON.parse(localStorage.getItem("ht_habits") || "null") || DEFAULT_HABITS;
+let checks = JSON.parse(localStorage.getItem("ht_checks") || "{}");
+function save(){ localStorage.setItem("ht_habits", JSON.stringify(habits)); localStorage.setItem("ht_checks", JSON.stringify(checks)); }
+
+const now = new Date();
+let year = now.getFullYear(), month = now.getMonth();
+let selectedDay = null, addMode = false, newName = "", newEmoji = "⭐";
+
+// ── Render ─────────────────────────────────────────────
+function render() {
+  const totalDays = getDays(year, month);
+  const firstDow = getFirstDow(year, month);
+
+  function checkedCount(d){ return habits.filter(h => checks[ck(h.id,year,month,d)]).length; }
+  const totalDone = habits.reduce((acc,h)=>{ for(let d=1;d<=totalDays;d++) if(checks[ck(h.id,year,month,d)]) acc++; return acc; },0);
+  const totalPossible = habits.length * totalDays;
+  const pct = totalPossible > 0 ? Math.round(totalDone/totalPossible*100) : 0;
+
+  // Build calendar cells
+  let calHTML = "";
+  // empty cells
+  for(let i=0;i<firstDow;i++) calHTML += `<div></div>`;
+  for(let d=1;d<=totalDays;d++){
+    const isToday = now.getFullYear()===year && now.getMonth()===month && now.getDate()===d;
+    const count = checkedCount(d);
+    const ratio = habits.length > 0 ? count/habits.length : 0;
+    const dow = (firstDow+d-1)%7;
+    let bg = "#111120";
+    if(ratio>0&&ratio<0.5) bg="#3b0764";
+    else if(ratio>=0.5&&ratio<1) bg="#6d28d9";
+    else if(ratio===1) bg="#7C3AED";
+    const border = (isToday||selectedDay===d) ? "2px solid #C084FC" : "2px solid transparent";
+    const shadow = ratio===1 ? "0 0 10px #7C3AED66" : "none";
+    const numColor = ratio>0?"#e9d5ff":dow===0?"#F87171":dow===6?"#60A5FA":"#555";
+
+    const dots = habits.map(h=>`<div style="width:4px;height:4px;border-radius:50%;background:${checks[ck(h.id,year,month,d)]?h.color:"#2a2a3e"};"></div>`).join("");
+
+    calHTML += `<div onclick="selectDay(${d})" style="aspect-ratio:1;border-radius:10px;background:${bg};border:${border};cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:${shadow};transition:all 0.15s;">
+      <span style="font-size:12px;font-weight:${isToday?800:500};color:${numColor};">${d}</span>
+      <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:28px;">${dots}</div>
+    </div>`;
+  }
+
+  // Habit pills
+  let pillsHTML = habits.map(h=>`
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:${h.color}18;border:1px solid ${h.color}55;font-size:12px;color:${h.color};font-weight:600;">
+      <span>${h.emoji}</span><span>${h.name}</span>
+      <span onclick="removeHabit(${h.id})" style="cursor:pointer;color:#555;margin-left:2px;font-size:10px;">✕</span>
+    </div>`).join("");
+  pillsHTML += `<div onclick="toggleAddMode()" style="padding:5px 12px;border-radius:99px;border:1px dashed #333;background:transparent;color:#555;font-size:12px;cursor:pointer;">+ 추가</div>`;
+
+  // Add form
+  const addFormHTML = addMode ? `
+    <div style="background:#1a1a2e;border-radius:14px;padding:14px;margin-bottom:16px;display:flex;gap:8px;animation:fadeIn 0.2s ease;">
+      <input id="emojiInput" value="${newEmoji}" maxlength="2" oninput="newEmoji=this.value" style="width:42px;text-align:center;font-size:18px;background:#0d0d14;border:1px solid #333;border-radius:10px;padding:8px 4px;" />
+      <input id="nameInput" value="${newName}" placeholder="습관 이름" oninput="newName=this.value" onkeydown="if(event.key==='Enter')addHabit()" style="flex:1;padding:0 12px;font-size:13px;background:#0d0d14;border:1px solid #333;border-radius:10px;" />
+      <button onclick="addHabit()" style="padding:0 16px;border-radius:10px;border:none;background:#7C3AED;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">추가</button>
+    </div>` : "";
+
+  // Day detail
+  let detailHTML = "";
+  if(selectedDay){
+    const rows = habits.map(h=>{
+      const checked = !!checks[ck(h.id,year,month,selectedDay)];
+      return `<div onclick="toggleCheck(${h.id},${selectedDay})" style="display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:14px;background:${checked?h.color+"18":"#1a1a2e"};border:1.5px solid ${checked?h.color+"66":"#2a2a3e"};cursor:pointer;transition:all 0.18s;margin-bottom:8px;">
+        <div style="width:26px;height:26px;border-radius:50%;background:${checked?h.color:"#2a2a3e"};display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;flex-shrink:0;">${checked?"✓":""}</div>
+        <span style="font-size:18px;">${h.emoji}</span>
+        <span style="color:${checked?h.color:"#888"};font-weight:${checked?700:400};font-size:14px;flex:1;">${h.name}</span>
+        ${checked?`<span style="font-size:11px;color:${h.color};">완료!</span>`:""}
+      </div>`;
+    }).join("");
+    detailHTML = `
+      <div style="margin-top:20px;background:#13131f;border:1px solid #2a2a3e;border-radius:20px;padding:20px;animation:fadeIn 0.2s ease;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div>
+            <div style="color:#7C3AED;font-size:11px;font-weight:700;">${month+1}월 ${selectedDay}일</div>
+            <div style="color:#fff;font-size:16px;font-weight:700;margin-top:2px;">오늘의 습관 체크</div>
+          </div>
+          <div style="color:#555;font-size:12px;">${checkedCount(selectedDay)}/${habits.length} 완료</div>
+        </div>
+        ${habits.length===0?`<div style="color:#444;text-align:center;padding:20px 0;font-size:13px;">습관을 추가해 주세요</div>`:rows}
+      </div>`;
+  }
+
+  document.getElementById("app").innerHTML = `
+    <div style="padding:24px 16px 48px;max-width:500px;margin:0 auto;">
+      <div style="margin-bottom:24px;">
+        <div style="font-size:11px;letter-spacing:5px;color:#7C3AED;text-transform:uppercase;margin-bottom:6px;">Rachel's</div>
+        <div style="font-size:26px;font-weight:800;letter-spacing:-0.5px;">꾸준함 달력</div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;">
+          <div style="flex:1;height:5px;background:#1e1e2e;border-radius:99px;">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#7C3AED,#C084FC);border-radius:99px;transition:width 0.5s ease;"></div>
+          </div>
+          <span style="color:#C084FC;font-size:13px;font-weight:700;min-width:36px;">${pct}%</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">${pillsHTML}</div>
+      ${addFormHTML}
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <button onclick="prevMonth()" style="background:none;border:none;color:#555;font-size:24px;cursor:pointer;padding:4px 10px;">‹</button>
+        <span style="font-weight:700;font-size:16px;">${year}년 ${MONTH_KR[month]}</span>
+        <button onclick="nextMonth()" style="background:none;border:none;color:#555;font-size:24px;cursor:pointer;padding:4px 10px;">›</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;">
+        ${DOW_KR.map((d,i)=>`<div style="text-align:center;font-size:11px;font-weight:600;color:${i===0?"#F87171":i===6?"#60A5FA":"#444"};padding-bottom:8px;">${d}</div>`).join("")}
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">${calHTML}</div>
+
+      ${detailHTML}
+
+      <div style="text-align:center;margin-top:28px;color:#2a2a3e;font-size:11px;">날짜를 클릭해 습관을 체크하세요 ✦</div>
+    </div>`;
+}
+
+// ── Actions ───────────────────────────────────────────
+function selectDay(d){ selectedDay = selectedDay===d ? null : d; render(); }
+function toggleCheck(hid, d){ const k=ck(hid,year,month,d); checks[k]=!checks[k]; save(); render(); }
+function prevMonth(){ if(month===0){year--;month=11;}else month--; selectedDay=null; render(); }
+function nextMonth(){ if(month===11){year++;month=0;}else month++; selectedDay=null; render(); }
+function toggleAddMode(){ addMode=!addMode; render(); setTimeout(()=>{ const el=document.getElementById("nameInput"); if(el) el.focus(); },50); }
+function addHabit(){
+  const name = document.getElementById("nameInput")?.value.trim() || newName.trim();
+  const emoji = document.getElementById("emojiInput")?.value || newEmoji;
+  if(!name) return;
+  habits.push({ id: Date.now(), name, emoji, color: COLORS[habits.length % COLORS.length] });
+  save(); addMode=false; newName=""; newEmoji="⭐"; render();
+}
+function removeHabit(id){ habits=habits.filter(h=>h.id!==id); save(); render(); }
+
+// ── PWA ───────────────────────────────────────────────
+if("serviceWorker" in navigator){ window.addEventListener("load", ()=>{ navigator.serviceWorker.register("/sw.js"); }); }
+
+render();
+</script>
+</body>
+</html>
